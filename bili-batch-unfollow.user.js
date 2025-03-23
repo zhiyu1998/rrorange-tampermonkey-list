@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Bilibili批量取消关注脚本
+// @name         Bilibili批量取消关注
 // @namespace    http://tampermonkey.net/
 // @version      1.0.0
 // @description  一键批量取消哔哩哔哩关注(支持并发处理，自动循环处理所有页面，增强循环可靠性，可拖动面板，自动验证处理)
