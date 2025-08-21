@@ -7,3 +7,4 @@
 | Linux.do 左右分栏浏览 | Linux.do 论坛的左右分栏浏览功能，支持调整宽度 | [本地脚本](linux-do-split-screen.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-07-01_19-20-59.gif" style="max-width: 400px;"></div> |
 | 网页地址发送到Telegram | 使用快捷键`(Alt + T)`将当前网页地址通过Telegram机器人发送给自己 | [本地脚本](send-to-tg.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/send2tg.gif" style="max-width: 400px;"></div> |
 | Linux.do 楼主帖子快速截图 | 在 Linux.do 帖子页面为楼主的帖子添加快速截图按钮，支持预览、复制到剪贴板和下载图片，截图字体和样式已美化 | [本地脚本](screen-linuxdo.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/screenlinuxdo.gif" style="max-width: 400px;"></div> |
+| Bilibili 快速收藏 | 在B站视频播放页添加"快速收藏"按钮。完美复刻原生UI风格，不会阻塞视频缩略图加载。新增：右键图片选择收藏夹功能。 | [本地脚本](bili-auto-favorite.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-08-21_14-37-16.gif" style="max-width: 400px;"></div> |
