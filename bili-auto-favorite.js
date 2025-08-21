@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 快速收藏
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      1.0.0
 // @description  在B站视频播放页添加"快速收藏"按钮。完美复刻原生UI风格，不会阻塞视频缩略图加载。新增：右键图片选择收藏夹功能。
 // @author       YourName & AliubYiero (Inspired by)
 // @match        https://www.bilibili.com/video/*
