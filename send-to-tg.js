@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Send To Telegram
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.0.4
 // @description  将当前网页地址通过Telegram机器人发送给自己，支持快捷键(alt + t)、SweetAlert2美化提示和系统通知。
-// @author       You & AI Assistant
+// @author       zhiyu1998
 // @match        *://*/*
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
@@ -11,7 +11,7 @@
 // @require      https://cdn.jsdelivr.net/npm/sweetalert2@11
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     // --- 配置区域 ---
@@ -24,7 +24,7 @@
     GM_registerMenuCommand('发送当前网页到Telegram', sendUrlToTelegram);
 
     // 添加键盘快捷键监听
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
         // 使用 e.code 进行判断，兼容性更强
 
         // 快捷键1: Ctrl + Shift + S
@@ -59,7 +59,7 @@
             url: apiUrl,
             headers: { 'Content-Type': 'application/json' },
             data: JSON.stringify({ chat_id: CHAT_ID, text: message, disable_web_page_preview: false }),
-            onload: function(response) {
+            onload: function (response) {
                 try {
                     const result = JSON.parse(response.responseText);
                     if (result.ok) {
@@ -85,7 +85,7 @@
                     console.error('解析响应时出错:', e);
                 }
             },
-            onerror: function(error) {
+            onerror: function (error) {
                 Swal.fire({ icon: 'error', title: '网络错误', text: '无法连接到Telegram API，请检查网络或代理设置。' });
                 GM_notification({ title: '网络错误', text: '无法连接到Telegram API。' });
                 console.error('GM_xmlhttpRequest 请求错误:', error);
