@@ -2,7 +2,6 @@
 
 | 脚本名称 | 描述 | 链接 | 预览 |
 |----------|------|------|------|
-| Anthropic Docs 一键导出Markdown | Crawls the Anthropic docs sidebar, clicks "Copy page" on each page, and combines the resulting markdown into a single file for download | [本地脚本](anthropic-docs-exporter.js) | <div style="max-height: 300px; overflow: auto;">即将添加预览图片</div> |
 | 哔哩哔哩批量自动取消关注 | 批量自动取消关注的脚本 | [GreasyFork](https://greasyfork.org/zh-CN/scripts/530598-bilibili%E6%89%B9%E9%87%8F%E5%8F%96%E6%B6%88%E5%85%B3%E6%B3%A8%E8%84%9A%E6%9C%AC) / [精简版](bili-batch-unfollow-simplify.user.js) | <div style="max-height: 300px; overflow: auto;">界面：<br><img src="./images/PixPin_2025-03-23_13-37-42.png" style="max-width: 400px;"><br>操作效果：<br><img src="./images/PixPin_2025-03-23_13-36-39.gif" style="max-width: 400px;"></div> |
 | 快速复制当前网站为 MD（标题、链接） | 快速复制当前网站为 Markdown 格式的脚本 | [GreasyFork](https://greasyfork.org/zh-CN/scripts/530599-%E7%81%B5%E5%8A%A8-md-%E9%93%BE%E6%8E%A5%E5%A4%8D%E5%88%B6) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-03-23_15-54-56.gif" style="max-width: 400px;"></div> |
 | Linux.do 左右分栏浏览 | Linux.do 论坛的左右分栏浏览功能，支持调整宽度 | [本地脚本](linux-do-split-screen.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-07-01_19-20-59.gif" style="max-width: 400px;"></div> |
@@ -12,3 +11,4 @@
 | Linux.do 稍后阅读 | 为Linux.do论坛添加稍后阅读功能，可以保存帖子并在侧边栏查看 | [本地脚本](linux-do-read-later.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-08-22_23-26-36.gif" style="max-width: 400px;"></div> |
 | Linux.do 快速复制主帖Markdown | 快速复制Linux.do主帖子内容为Markdown格式到剪切板 | [本地脚本](linux-do-copy-markdown.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-08-23_09-23-29.gif" style="max-width: 400px;"></div> |
 | 抖音网页版快捷键 - 倍速切换 (Mac兼容版) | 在抖音网页版使用Shift+1切换1倍速，Shift+2切换2倍速，Shift+3切换1.5倍速，同时兼容Mac特殊字符输入 | [本地脚本](douyin-speed.js) | <div style="max-height: 300px; overflow: auto;">即将添加预览图片</div> |
+| Anthropic Docs 一键导出Markdown | 遍历Anthropic文档侧边栏，自动复制所有页面内容并合并为单个Markdown文件导出 | [本地脚本](anthropic-docs-exporter.js) | <div style="max-height: 300px; overflow: auto;">即将添加预览图片</div> |
