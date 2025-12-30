@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         B站/油管&视频转Get笔记
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.1.0
 // @description  一键将 Bilibili 或 YouTube 视频转换为Get笔记。
 // @author       RrOrange
 // @match        https://www.bilibili.com/video/*
@@ -60,20 +60,20 @@
 
     function createStyles() {
         const styles = `
-            .gn-to-get-btn { position: fixed; z-index: 9999; background: rgba(0, 122, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); color: white; border: none; border-radius: 14px; padding: 12px 24px; font-size: 15px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; box-shadow: 0 4px 20px rgba(0, 122, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1); transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); border: 0.5px solid rgba(255, 255, 255, 0.1); letter-spacing: -0.02em; user-select: none; -webkit-user-select: none; }
-            .gn-to-get-btn:hover { transform: translateY(-50%) scale(1.02); box-shadow: 0 6px 25px rgba(0, 122, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15); }
-            .gn-to-get-btn:active { transform: translateY(0px) scale(0.98); box-shadow: 0 2px 10px rgba(0, 122, 255, 0.3); transition: all 0.1s ease; }
-            .gn-to-get-btn:disabled { opacity: 0.8; cursor: not-allowed; transform: none; }
-            /* B站按钮样式 */
-            .gn-to-get-single-bili { top: 50%; right: 24px; transform: translateY(-50%); background: rgba(252, 98, 142, 0.95); box-shadow: 0 4px 20px rgba(252, 98, 142, 0.25); }
-            .gn-to-get-single-bili:hover { background: rgba(252, 98, 142, 1); box-shadow: 0 6px 25px rgba(252, 98, 142, 0.35); }
-            /* YouTube按钮样式 */
-            .gn-to-get-single-youtube { top: 50%; right: 24px; transform: translateY(-50%); background: rgba(255, 0, 0, 0.95); box-shadow: 0 4px 20px rgba(255, 0, 0, 0.25); }
-            .gn-to-get-single-youtube:hover { background: rgba(255, 0, 0, 1); box-shadow: 0 6px 25px rgba(255, 0, 0, 0.35); }
+            .gn-to-get-btn { position: fixed; z-index: 9999; background: transparent; color: #666; border: 1px solid rgba(200, 200, 200, 0.2); border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: all 0.2s ease; user-select: none; -webkit-user-select: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+            .gn-to-get-btn:hover { background: rgba(120, 120, 120, 0.25); color: #333; border-color: rgba(180, 180, 180, 0.3); }
+            .gn-to-get-btn:active { background: rgba(120, 120, 120, 0.35); transform: scale(0.98); }
+            .gn-to-get-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+            /* B站按钮样式 - 更隐蔽的位置和颜色 */
+            .gn-to-get-single-bili { bottom: 20px; right: 20px; background: transparent; color: #999; border-color: rgba(220, 220, 220, 0.5); }
+            .gn-to-get-single-bili:hover { background: rgba(252, 98, 142, 0.1); color: #fc628e; border-color: rgba(252, 98, 142, 0.3); }
+            /* YouTube按钮样式 - 更隐蔽的位置和颜色 */
+            .gn-to-get-single-youtube { bottom: 20px; right: 20px; background: transparent; color: #999; border-color: rgba(220, 220, 220, 0.5); }
+            .gn-to-get-single-youtube:hover { background: rgba(255, 0, 0, 0.1); color: #ff0000; border-color: rgba(255, 0, 0, 0.3); }
 
-            /* Get笔记状态提示 */
-            #get-note-status { position: fixed; top: 24px; right: 24px; z-index: 10000; background: rgba(28, 28, 30, 0.95); backdrop-filter: blur(20px); color: white; padding: 12px 20px; border-radius: 16px; font-size: 15px; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); cursor: default; transition: all 0.3s ease; border: 0.5px solid rgba(255, 255, 255, 0.1); user-select: none; animation: slideInRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-            @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+            /* Get笔记状态提示 - 更低调的样式 */
+            #get-note-status { position: fixed; top: 20px; right: 20px; z-index: 10000; background: rgba(248, 248, 248, 0.95); color: #333; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 400; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); cursor: default; transition: all 0.3s ease; border: 1px solid rgba(200, 200, 200, 0.2); user-select: none; animation: slideInRight 0.3s ease-out; }
+            @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         `;
         const styleSheet = document.createElement('style');
         styleSheet.textContent = styles;
