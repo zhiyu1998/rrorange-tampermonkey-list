@@ -17,7 +17,7 @@
 
     // --- 配置区域 ---
     const BOT_TOKEN = ''; // 替换为你的Telegram机器人Token
-    const CHAT_ID = '';     // 替换为你的Chat ID
+    const CHAT_ID = '';     // 替换为你的Chat ID (数字ID，例如: '123456789')
 
     // --- 功能实现 ---
 
@@ -44,7 +44,7 @@
      * 发送URL到Telegram的核心函数
      */
     function sendUrlToTelegram() {
-        if (BOT_TOKEN.includes('YOUR_BOT_TOKEN') || CHAT_ID.includes('YOUR_CHAT_ID')) {
+        if (!BOT_TOKEN || !CHAT_ID || BOT_TOKEN.includes('YOUR_BOT_TOKEN') || CHAT_ID.includes('YOUR_CHAT_ID')) {
             Swal.fire({ icon: 'warning', title: '配置不完整', text: '请先在脚本中修改 BOT_TOKEN 和 CHAT_ID！' });
             return;
         }
@@ -59,7 +59,7 @@
             method: 'POST',
             url: apiUrl,
             headers: { 'Content-Type': 'application/json' },
-            data: JSON.stringify({ chat_id: CHAT_ID, text: message, disable_web_page_preview: false }),
+            data: JSON.stringify({ chat_id: parseInt(CHAT_ID), text: message, disable_web_page_preview: false }),
             onload: function (response) {
                 try {
                     const result = JSON.parse(response.responseText);
