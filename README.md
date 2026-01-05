@@ -15,3 +15,4 @@
 | B站/油管视频转Get笔记 | 一键将 Bilibili 或 YouTube 视频转换为Get笔记，自动提取视频信息并调用 Get Notes API | [本地脚本](get_note.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2025-12-30_16-47-03.png"  style="max-width: 400px;"></div> |
 | 抖音网页版快捷键 - 倍速切换 (Mac兼容版) | 在抖音网页版使用Shift+1切换1倍速，Shift+2切换2倍速，Shift+3切换1.5倍速，同时兼容Mac特殊字符输入 | [本地脚本](douyin-speed.js) | <div style="max-height: 300px; overflow: auto;">即将添加预览图片</div> |
 | Anthropic Docs 一键导出Markdown (v2.5) | 遍历Anthropic文档的所有标签页和侧边栏链接，自动复制所有页面内容并合并为单个Markdown文件导出，支持多标签页布局、404页面自动跳过和智能重试机制 | [本地脚本](anthropic-docs-exporter.js) | <div style="max-height: 300px; overflow: auto;">即将添加预览图片</div> |
+| Twitter/X 推文快速截图 | 在Twitter/X推文的"更多"菜单中添加"Screenshot"和"Capture Thread"按钮，支持单条推文截图和完整线程截图，自动复制到剪贴板或下载 | [本地脚本](x-screenshot.js) | <div style="max-height: 300px; overflow: auto;"><img src="./images/PixPin_2026-01-05_17-03-48.gif" style="max-width: 400px;"></div> |
