@@ -7,7 +7,7 @@
 // @match        https://twitter.com/*
 // @match        https://x.com/*
 // @grant        GM_addStyle
-// @require      https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js
+// @require      https://unpkg.com/@zumer/snapdom/dist/snapdom.js
 // @license MIT
 // ==/UserScript==
 
@@ -63,13 +63,108 @@
         }
     `);
 
+    // Helper function to draw rounded rectangle
+    function roundRect(ctx, x, y, width, height, radius) {
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+
+    // Helper function to apply rounded corners and gradient border to canvas
+    function applyBeautification(canvas) {
+        const width = canvas.width;
+        const height = canvas.height;
+        const borderRadius = Math.max(16, Math.floor(width * 0.02)); // Responsive border radius
+        const padding = Math.max(32, Math.floor(width * 0.04)); // Responsive padding (wider for better visibility)
+        
+        // Create new canvas with extra space for border
+        const newCanvas = document.createElement('canvas');
+        newCanvas.width = width + padding * 2;
+        newCanvas.height = height + padding * 2;
+        const newCtx = newCanvas.getContext('2d');
+        
+        // Draw gradient border with rounded corners
+        const gradient = newCtx.createLinearGradient(0, 0, newCanvas.width, newCanvas.height);
+        gradient.addColorStop(0, '#CCCCE8');
+        gradient.addColorStop(1, '#C0C4E8');
+        
+        // Draw rounded rectangle with gradient
+        newCtx.fillStyle = gradient;
+        roundRect(newCtx, 0, 0, newCanvas.width, newCanvas.height, borderRadius);
+        newCtx.fill();
+        
+        // Draw original canvas on top with rounded corners
+        newCtx.save();
+        roundRect(newCtx, padding, padding, width, height, borderRadius - 2);
+        newCtx.clip();
+        newCtx.drawImage(canvas, padding, padding);
+        newCtx.restore();
+        
+        return newCanvas;
+    }
+
+    // Helper function to handle videos in tweet - pause and capture current frame
+    async function handleVideos(tweetContainer) {
+        const videos = tweetContainer.querySelectorAll('video');
+        const videoStates = [];
+        
+        // Save current video states and pause them
+        videos.forEach(video => {
+            videoStates.push({
+                element: video,
+                wasPaused: video.paused,
+                currentTime: video.currentTime
+            });
+            
+            // Draw current video frame to canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth || video.clientWidth;
+            canvas.height = video.videoHeight || video.clientHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Replace video with canvas
+            const videoCanvas = document.createElement('canvas');
+            videoCanvas.width = canvas.width;
+            videoCanvas.height = canvas.height;
+            videoCanvas.getContext('2d').drawImage(canvas, 0, 0);
+            videoCanvas.style.cssText = window.getComputedStyle(video).cssText;
+            videoCanvas.className = video.className;
+            
+            video.parentNode.replaceChild(videoCanvas, video);
+        });
+        
+        return videoStates;
+    }
+
+    // Helper function to restore videos after screenshot
+    function restoreVideos(videoStates) {
+        videoStates.forEach(state => {
+            if (state.element.parentNode) {
+                // Replace canvas back with video
+                const canvas = state.element.parentNode.querySelector('canvas');
+                if (canvas) {
+                    canvas.parentNode.replaceChild(state.element, canvas);
+                }
+            }
+        });
+    }
+
     function findTweetMainContent(menuButton) {
         const article = menuButton.closest('article[role="article"]');
         if (!article) return null;
         return article;
     }
 
-    function takeScreenshot(menuButton) {
+    async function takeScreenshot(menuButton) {
         const notification = document.createElement('div');
         notification.className = 'screenshot-notification';
         notification.innerHTML = 'Taking screenshot...';
@@ -81,14 +176,8 @@
                 throw new Error('Could not find tweet content');
             }
 
-            // Save original styles
-            const originalStyles = {
-                background: tweetContainer.style.background,
-                backgroundColor: tweetContainer.style.backgroundColor,
-                margin: tweetContainer.style.margin,
-                border: tweetContainer.style.border,
-                borderRadius: tweetContainer.style.borderRadius
-            };
+            // Handle videos - pause and capture current frame
+            const videoStates = await handleVideos(tweetContainer);
 
             // Optimize clarity settings
             const scale = window.devicePixelRatio * 2;
@@ -116,69 +205,66 @@
             // --- End Background Color Detection ---
 
             const config = {
-                height: tweetContainer.offsetHeight * scale,
-                width: tweetContainer.offsetWidth * scale,
-                style: {
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    width: `${tweetContainer.offsetWidth}px`,
-                    height: `${tweetContainer.offsetHeight}px`,
-                    margin: 0, // Ensure no extra margin affects layout
-                    border: 'none', // Remove borders for stitching
-                    borderRadius: 0 // Remove border radius for stitching
-                },
+                scale: scale,
+                backgroundColor: bgColor,
                 quality: 1.0
             };
-            // --- Add bgcolor to config ---
-            config.bgcolor = bgColor;
-            // --- End add bgcolor ---
 
-            // Use dom-to-image for high-quality screenshot
-            domtoimage.toBlob(tweetContainer, config)
-                .then(function (blob) {
-                    // Copy to clipboard
-                    navigator.clipboard.write([
-                        new ClipboardItem({
-                            'image/png': blob
-                        })
-                    ]).then(() => {
-                        notification.innerHTML = `
-                            <div>Screenshot copied to clipboard!</div>
-                            <button class="download-btn" style="
-                                background: white;
-                                color: #1DA1F2;
-                                border: none;
-                                padding: 5px 10px;
-                                border-radius: 15px;
-                                margin-top: 5px;
-                                cursor: pointer;
-                            ">Download</button>
-                        `;
-                        notification.style.backgroundColor = '#17BF63';
+            // Use snapdom for high-quality screenshot
+            snapdom.toCanvas(tweetContainer, config)
+                .then(function (canvas) {
+                    // Apply beautification (rounded corners + gradient border)
+                    const beautifiedCanvas = applyBeautification(canvas);
+                    
+                    // Convert to blob
+                    beautifiedCanvas.toBlob(function (blob) {
+                        // Copy to clipboard
+                        navigator.clipboard.write([
+                            new ClipboardItem({
+                                'image/png': blob
+                            })
+                        ]).then(() => {
+                            notification.innerHTML = `
+                                <div>Screenshot copied to clipboard!</div>
+                                <button class="download-btn" style="
+                                    background: white;
+                                    color: #1DA1F2;
+                                    border: none;
+                                    padding: 5px 10px;
+                                    border-radius: 15px;
+                                    margin-top: 5px;
+                                    cursor: pointer;
+                                ">Download</button>
+                            `;
+                            notification.style.backgroundColor = '#17BF63';
 
-                        // Add download button functionality
-                        const downloadBtn = notification.querySelector('.download-btn');
-                        downloadBtn.addEventListener('click', () => {
-                            const link = document.createElement('a');
-                            link.download = `twitter-post-${Date.now()}.png`;
-                            link.href = URL.createObjectURL(blob);
-                            link.click();
-                            URL.revokeObjectURL(link.href);
-                            notification.remove();
+                            // Add download button functionality
+                            const downloadBtn = notification.querySelector('.download-btn');
+                            downloadBtn.addEventListener('click', () => {
+                                const link = document.createElement('a');
+                                link.download = `twitter-post-${Date.now()}.png`;
+                                link.href = URL.createObjectURL(blob);
+                                link.click();
+                                URL.revokeObjectURL(link.href);
+                                notification.remove();
+                            });
+
+                            // 设置3秒后渐隐消失
+                            setTimeout(() => {
+                                notification.classList.add('fade-out');
+                                setTimeout(() => notification.remove(), 500);
+                            }, 1500);
                         });
-
-                        // 设置3秒后渐隐消失
-                        setTimeout(() => {
-                            notification.classList.add('fade-out');
-                            setTimeout(() => notification.remove(), 500);
-                        }, 1500);
-                    });
+                    }, 'image/png', 1.0);
                 })
                 .catch(function (error) {
                     console.error('Screenshot failed:', error);
                     notification.textContent = 'Screenshot failed';
                     notification.style.backgroundColor = '#E0245E';
                     setTimeout(() => notification.remove(), 2000);
+                }).finally(() => {
+                    // Restore videos after screenshot
+                    restoreVideos(videoStates);
                 });
         } catch (error) {
             console.error('Error during screenshot:', error);
@@ -409,6 +495,9 @@
                 // await new Promise(resolve => setTimeout(resolve, 100)); // Small delay after scroll
 
                 try {
+                    // Handle videos in this tweet
+                    const tweetVideoStates = await handleVideos(tweet);
+
                     // ---> New: Check for and click internal "Show more" button within the tweet text
                     const internalShowMoreButton = tweet.querySelector('button[data-testid="tweet-text-show-more-link"]');
                     if (internalShowMoreButton) {
@@ -440,30 +529,24 @@
                     // --- End Background Color Detection ---
 
                     const config = {
-                        height: tweet.offsetHeight * scale,
-                        width: tweet.offsetWidth * scale,
-                        style: {
-                            transform: `scale(${scale})`,
-                            transformOrigin: 'top left',
-                            width: `${tweet.offsetWidth}px`,
-                            height: `${tweet.offsetHeight}px`,
-                            margin: 0, // Ensure no extra margin affects layout
-                            border: 'none', // Remove borders for stitching
-                            borderRadius: 0 // Remove border radius for stitching
-                        },
+                        scale: scale,
+                        backgroundColor: threadBgColor,
                         quality: 0.95 // Slightly lower quality for performance/size
                     };
-                    // --- Add bgcolor to config (for thread) ---
-                    config.bgcolor = threadBgColor;
-                    // --- End add bgcolor ---
 
-                    const blob = await domtoimage.toBlob(tweet, config);
-                    blobs.push(blob);
+                    const canvas = await snapdom.toCanvas(tweet, config);
+                    blobs.push(canvas);
+                    
+                    // Restore videos after screenshot
+                    restoreVideos(tweetVideoStates);
                 } catch (screenshotError) {
                     console.error(`Failed to screenshot tweet ${i + 1}:`, screenshotError);
                     // Optionally skip this tweet or stop the process
                     notification.innerHTML = `Error screenshotting tweet ${i + 1}. Skipping.`;
                     await new Promise(resolve => setTimeout(resolve, 1500));
+                    
+                    // Restore videos on error
+                    restoreVideos(tweetVideoStates);
                 }
             }
 
@@ -473,45 +556,40 @@
 
             notification.innerHTML = `Combining ${blobs.length} screenshots...`;
 
-            // 5. Combine images using Canvas
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+            // 5. Combine canvases using Canvas
             let totalHeight = 0;
             let maxWidth = 0;
-            const images = [];
 
-            // Convert blobs to Image objects to get dimensions
-            for (const blob of blobs) {
-                const img = new Image();
-                const url = URL.createObjectURL(blob);
-                img.src = url;
-                await new Promise(resolve => { img.onload = resolve; }); // Wait for image data to load
-                images.push(img);
-                totalHeight += img.height;
-                maxWidth = Math.max(maxWidth, img.width);
-                // URL.revokeObjectURL(url); // Revoke later after drawing
+            // Get dimensions from all canvases
+            for (const canvas of blobs) {
+                totalHeight += canvas.height;
+                maxWidth = Math.max(maxWidth, canvas.width);
             }
 
-            // Set canvas dimensions
-            canvas.width = maxWidth;
-            canvas.height = totalHeight;
+            // Create combined canvas
+            const combinedCanvas = document.createElement('canvas');
+            const ctx = combinedCanvas.getContext('2d');
+            combinedCanvas.width = maxWidth;
+            combinedCanvas.height = totalHeight;
 
-            // Draw images onto canvas
+            // Draw canvases onto combined canvas
             let currentY = 0;
-            for (const img of images) {
-                ctx.drawImage(img, 0, currentY);
-                currentY += img.height;
-                URL.revokeObjectURL(img.src); // Revoke URL now
+            for (const canvas of blobs) {
+                ctx.drawImage(canvas, 0, currentY);
+                currentY += canvas.height;
             }
 
-            // 6. Get final blob from canvas
-            canvas.toBlob(function (finalBlob) {
+            // Apply beautification (rounded corners + gradient border) to combined canvas
+            const beautifiedCanvas = applyBeautification(combinedCanvas);
+
+            // 6. Get final blob from beautified canvas
+            beautifiedCanvas.toBlob(function (finalBlob) {
                 // 7. Handle final blob (copy/download/notification)
                 navigator.clipboard.write([
                     new ClipboardItem({ 'image/png': finalBlob })
                 ]).then(() => {
                     notification.innerHTML = `
-                        <div>Thread screenshot copied! (${images.length} posts)</div>
+                        <div>Thread screenshot copied! (${blobs.length} posts)</div>
                         <button class="download-btn" style="background: white; color: #1DA1F2; border: none; padding: 5px 10px; border-radius: 15px; margin-top: 5px; cursor: pointer;">Download</button>
                     `;
                     notification.style.backgroundColor = '#17BF63';
