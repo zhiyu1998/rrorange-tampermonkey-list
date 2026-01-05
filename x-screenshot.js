@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitter Screenshot Button
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Add a screenshot button to Twitter/X post menus
 // @author       RrOrange
 // @match        https://twitter.com/*
@@ -78,6 +78,14 @@
         ctx.closePath();
     }
 
+    function prefersDarkMode() {
+        try {
+            return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        } catch (e) {
+            return false;
+        }
+    }
+
     // Helper function to apply rounded corners and gradient border to canvas
     function applyBeautification(canvas) {
         const width = canvas.width;
@@ -93,8 +101,13 @@
         
         // Draw gradient border with rounded corners
         const gradient = newCtx.createLinearGradient(0, 0, newCanvas.width, newCanvas.height);
-        gradient.addColorStop(0, '#CCCCE8');
-        gradient.addColorStop(1, '#C0C4E8');
+        if (prefersDarkMode()) {
+            gradient.addColorStop(0, '#1b1f2a');
+            gradient.addColorStop(1, '#0f1117');
+        } else {
+            gradient.addColorStop(0, '#CCCCE8');
+            gradient.addColorStop(1, '#C0C4E8');
+        }
         
         // Draw rounded rectangle with gradient
         newCtx.fillStyle = gradient;
@@ -103,7 +116,7 @@
         
         // Draw original canvas on top with rounded corners
         newCtx.save();
-        roundRect(newCtx, padding, padding, width, height, borderRadius - 2);
+        roundRect(newCtx, padding, padding, width, height, Math.max(0, borderRadius - 2));
         newCtx.clip();
         newCtx.drawImage(canvas, padding, padding);
         newCtx.restore();
