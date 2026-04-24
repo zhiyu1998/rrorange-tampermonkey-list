@@ -213,11 +213,20 @@
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 6px; font-size: 13px; color: #aaa;">🤖 模型名称</label>
-                        <input id="setting-model" type="text" value="${escapeAttr(CONFIG.MODEL)}" placeholder="例如: deepseek-chat, gpt-4o" style="
-                            width: 100%; padding: 10px 14px; background: #2d2d2d; color: #e0e0e0;
-                            border: 1px solid #444; border-radius: 8px; font-size: 14px; outline: none;
-                            box-sizing: border-box;
-                        " />
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input id="setting-model" type="text" list="model-list" value="${escapeAttr(CONFIG.MODEL)}" placeholder="输入或从列表选择模型" style="
+                                flex: 1; padding: 10px 14px; background: #2d2d2d; color: #e0e0e0;
+                                border: 1px solid #444; border-radius: 8px; font-size: 14px; outline: none;
+                                box-sizing: border-box;
+                            " />
+                            <datalist id="model-list"></datalist>
+                            <button id="fetch-models-btn" title="从 API 获取可用模型列表" style="
+                                padding: 10px 14px; background: #0e639c; color: white;
+                                border: none; border-radius: 8px; font-size: 14px;
+                                cursor: pointer; white-space: nowrap; transition: all 0.2s;
+                            ">🔄 获取模型</button>
+                        </div>
+                        <div style="margin-top: 4px; font-size: 11px; color: #666;">点击「获取模型」从 API 拉取可用模型列表，也可手动输入</div>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 6px; font-size: 13px; color: #aaa;">💻 编程语言</label>
@@ -284,6 +293,18 @@
             document.getElementById('toggle-key-visibility').textContent = isPassword ? '🙈' : '👁️';
         };
 
+        // 获取模型列表
+        document.getElementById('fetch-models-btn').onclick = () => fetchModels();
+
+        // 从缓存加载模型列表
+        const currentApiUrl = document.getElementById('setting-api-url').value.trim();
+        if (currentApiUrl) {
+            const cachedModels = getCachedModels(currentApiUrl);
+            if (cachedModels && cachedModels.length > 0) {
+                populateModelDatalist(cachedModels);
+            }
+        }
+
         // 保存
         document.getElementById('settings-save-btn').onclick = () => {
             CONFIG.API_URL      = document.getElementById('setting-api-url').value.trim();
@@ -318,6 +339,114 @@
 
     function escapeAttr(text) {
         return String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ================== 模型列表缓存 ==================
+    function getCacheKeyForApi(apiUrl) {
+        let baseUrl = apiUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/completions\/?$/, '');
+        baseUrl = baseUrl.replace(/\/+$/, '');
+        return 'cached_models_' + baseUrl;
+    }
+
+    function getCachedModels(apiUrl) {
+        const key = getCacheKeyForApi(apiUrl);
+        const cached = GM_getValue(key, null);
+        if (!cached) return null;
+        try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.models) && parsed.timestamp) {
+                // 缓存有效期 24 小时
+                if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+                    return parsed.models;
+                }
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function setCachedModels(apiUrl, modelIds) {
+        const key = getCacheKeyForApi(apiUrl);
+        GM_setValue(key, JSON.stringify({ models: modelIds, timestamp: Date.now() }));
+    }
+
+    function populateModelDatalist(modelIds) {
+        const datalist = document.getElementById('model-list');
+        if (!datalist) return;
+        datalist.innerHTML = '';
+        modelIds.forEach(id => {
+            const option = document.createElement('option');
+            option.value = id;
+            datalist.appendChild(option);
+        });
+    }
+
+    // ================== 获取模型列表 ==================
+    function fetchModels() {
+        const apiUrlInput = document.getElementById('setting-api-url');
+        const apiKeyInput = document.getElementById('setting-api-key');
+        const apiUrl = apiUrlInput ? apiUrlInput.value.trim() : '';
+        const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
+        if (!apiUrl) {
+            showToast('❌ 请先填写 API 地址', '#e74c3c');
+            return;
+        }
+        if (!apiKey) {
+            showToast('❌ 请先填写 API Key', '#e74c3c');
+            return;
+        }
+
+        // 从 API URL 中提取 base URL（去掉 /chat/completions 等路径）
+        let baseUrl = apiUrl.replace(/\/chat\/completions\/?$/, '').replace(/\/completions\/?$/, '');
+        // 去掉末尾斜杠
+        baseUrl = baseUrl.replace(/\/+$/, '');
+        const modelsUrl = baseUrl + '/models';
+
+        const btn = document.getElementById('fetch-models-btn');
+        const originalHTML = btn ? btn.innerHTML : '🔄';
+        if (btn) {
+            btn.innerHTML = '⏳';
+            btn.disabled = true;
+        }
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: modelsUrl,
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            },
+            timeout: 15000,
+            onload: (response) => {
+                try {
+                    const data = JSON.parse(response.responseText);
+                    // 兼容不同 API 的返回格式
+                    const models = data.data || data.models || [];
+
+                    const modelIds = models
+                        .map(m => (typeof m === 'string' ? m : (m.id || m.name || '')))
+                        .filter(id => id)
+                        .sort((a, b) => a.localeCompare(b));
+
+                    populateModelDatalist(modelIds);
+
+                    // 缓存模型列表
+                    setCachedModels(apiUrl, modelIds);
+
+                    showToast(`✅ 获取到 ${modelIds.length} 个可用模型（已缓存），点击模型输入框查看列表`, '#00b894');
+                } catch (e) {
+                    showToast('❌ 解析模型列表失败: ' + e.message, '#e74c3c');
+                }
+                if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+            },
+            onerror: () => {
+                showToast('❌ 获取模型列表失败，请检查 API 地址和 Key', '#e74c3c');
+                if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+            },
+            ontimeout: () => {
+                showToast('❌ 获取模型列表超时', '#e74c3c');
+                if (btn) { btn.innerHTML = originalHTML; btn.disabled = false; }
+            }
+        });
     }
 
     // ================== 自动检测当前编程语言 ==================
@@ -382,6 +511,7 @@
 
     // ================== 读取编辑器模板 ==================
     function readEditorContent() {
+        let modelContent = '';
         try {
             const editors = getMonacoEditors();
             if (editors && editors.length > 0) {
@@ -389,14 +519,24 @@
                 if (editor) {
                     const model = editor.getModel?.();
                     if (model) {
-                        return model.getValue();
+                        modelContent = normalizeEditorText(model.getValue?.() || '');
+                        if (modelContent.trim()) {
+                            return modelContent;
+                        }
                     }
                 }
             }
         } catch (e) {
             console.warn('从用户脚本上下文读取编辑器失败:', e);
         }
-        return '';
+
+        const domFallback = readEditorContentFromMonacoDom();
+        if (domFallback) {
+            console.log('[AI求解] 使用 Monaco DOM 兜底读取模板');
+            return domFallback;
+        }
+
+        return modelContent;
     }
 
     async function readEditorContentViaBridge(timeout = 2000) {
@@ -470,6 +610,40 @@ ${templateSection}
 直接输出代码：`;
     }
 
+    // ================== API 错误信息优化 ==================
+    function parseAPIError(status, responseText) {
+        let data;
+        try { data = JSON.parse(responseText); } catch (e) {}
+
+        // 优先使用 API 返回的 error.message
+        const apiMsg = data?.error?.message || data?.message || '';
+
+        // 去掉 trace_id 等前缀，保留核心错误信息
+        const cleanMsg = apiMsg.replace(/^\[trace_id:\s*\S+\]\s*/i, '').trim();
+
+        switch (status) {
+            case 401:
+                return 'API Key 无效或已过期，请检查设置面板中的 Key';
+            case 402:
+            case 403:
+                return cleanMsg
+                    ? `API 权限不足：${cleanMsg}`
+                    : 'API 权限不足，请检查账户余额或套餐';
+            case 429:
+                return cleanMsg
+                    ? `请求频率过高：${cleanMsg}`
+                    : '请求过于频繁，请稍后重试';
+            case 500:
+            case 502:
+            case 503:
+                return 'API 服务器暂时不可用，请稍后重试';
+            default:
+                if (cleanMsg) return cleanMsg;
+                if (apiMsg) return apiMsg;
+                return `API 返回错误 (HTTP ${status})`;
+        }
+    }
+
     // ================== 调用 API ==================
     function callAPI(prompt) {
         return new Promise((resolve, reject) => {
@@ -504,8 +678,8 @@ ${templateSection}
                         const data = JSON.parse(response.responseText);
                         if (data.choices && data.choices[0]) {
                             resolve(data.choices[0].message.content);
-                        } else if (data.error) {
-                            reject(new Error(data.error.message || 'API 返回错误'));
+                        } else if (data.error || response.status >= 400) {
+                            reject(new Error(parseAPIError(response.status, response.responseText)));
                         } else {
                             reject(new Error('API 返回格式异常'));
                         }
@@ -668,6 +842,96 @@ ${templateSection}
 
     function normalizeEditorText(text) {
         return String(text ?? '').replace(/\r\n/g, '\n');
+    }
+
+    function parseViewLineTop(lineNode, fallbackIndex = 0) {
+        const fromStyleProp = Number.parseFloat(lineNode?.style?.top ?? '');
+        if (Number.isFinite(fromStyleProp)) {
+            return fromStyleProp;
+        }
+
+        const inlineStyle = lineNode?.getAttribute?.('style') || '';
+        const match = inlineStyle.match(/top:\s*(-?\d+(?:\.\d+)?)px/i);
+        if (match) {
+            const parsed = Number.parseFloat(match[1]);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+
+        return fallbackIndex;
+    }
+
+    function readMonacoViewLinesContent(container) {
+        if (!container) return '';
+
+        const viewLinesRoots = Array.from(container.querySelectorAll('.view-lines'))
+            .filter(root => root.querySelector('.view-line'));
+
+        if (viewLinesRoots.length === 0) return '';
+
+        const bestRoot = viewLinesRoots
+            .map(root => ({
+                root,
+                lineCount: root.querySelectorAll('.view-line').length,
+                area: (() => {
+                    const rect = root.getBoundingClientRect?.();
+                    return rect ? rect.width * rect.height : 0;
+                })()
+            }))
+            .sort((a, b) => {
+                if (b.lineCount !== a.lineCount) return b.lineCount - a.lineCount;
+                return b.area - a.area;
+            })[0]?.root;
+
+        if (!bestRoot) return '';
+
+        const lines = Array.from(bestRoot.querySelectorAll('.view-line'))
+            .map((node, index) => ({
+                index,
+                top: parseViewLineTop(node, index),
+                text: String(node.textContent ?? '')
+                    .replace(/\u00a0/g, ' ')
+                    .replace(/\u200b/g, '')
+            }))
+            .sort((a, b) => {
+                if (a.top !== b.top) return a.top - b.top;
+                return a.index - b.index;
+            })
+            .map(item => item.text);
+
+        const content = normalizeEditorText(lines.join('\n'));
+        return content.trim() ? content : '';
+    }
+
+    function readEditorContentFromMonacoDom() {
+        const containers = [];
+        const seen = new Set();
+
+        const primaryContainer = getPrimaryMonacoContainer();
+        if (primaryContainer) {
+            containers.push(primaryContainer);
+            seen.add(primaryContainer);
+        }
+
+        Array.from(document.querySelectorAll('.monaco-editor'))
+            .filter(isVisibleElement)
+            .forEach(container => {
+                if (!seen.has(container)) {
+                    seen.add(container);
+                    containers.push(container);
+                }
+            });
+
+        let bestContent = '';
+        for (const container of containers) {
+            const content = readMonacoViewLinesContent(container);
+            if (content.length > bestContent.length) {
+                bestContent = content;
+            }
+        }
+
+        return bestContent;
     }
 
     function installPageBridge() {
@@ -858,6 +1122,91 @@ ${templateSection}
                 return editors.filter(Boolean).sort((a, b) => scoreEditor(b) - scoreEditor(a))[0] || null;
             };
 
+            const parseViewLineTop = (lineNode, fallbackIndex = 0) => {
+                const fromStyleProp = Number.parseFloat(lineNode?.style?.top ?? '');
+                if (Number.isFinite(fromStyleProp)) return fromStyleProp;
+
+                const inlineStyle = lineNode?.getAttribute?.('style') || '';
+                const match = inlineStyle.match(/top:\s*(-?\d+(?:\.\d+)?)px/i);
+                if (match) {
+                    const parsed = Number.parseFloat(match[1]);
+                    if (Number.isFinite(parsed)) return parsed;
+                }
+
+                return fallbackIndex;
+            };
+
+            const readMonacoViewLinesContent = (container) => {
+                if (!container) return '';
+
+                const viewLinesRoots = Array.from(container.querySelectorAll('.view-lines'))
+                    .filter(root => root.querySelector('.view-line'));
+                if (!viewLinesRoots.length) return '';
+
+                const bestRoot = viewLinesRoots
+                    .map(root => ({
+                        root,
+                        lineCount: root.querySelectorAll('.view-line').length,
+                        area: (() => {
+                            const rect = root.getBoundingClientRect?.();
+                            return rect ? rect.width * rect.height : 0;
+                        })()
+                    }))
+                    .sort((a, b) => {
+                        if (b.lineCount !== a.lineCount) return b.lineCount - a.lineCount;
+                        return b.area - a.area;
+                    })[0]?.root;
+
+                if (!bestRoot) return '';
+
+                const lines = Array.from(bestRoot.querySelectorAll('.view-line'))
+                    .map((node, index) => ({
+                        index,
+                        top: parseViewLineTop(node, index),
+                        text: String(node.textContent ?? '')
+                            .replace(/\u00a0/g, ' ')
+                            .replace(/\u200b/g, '')
+                    }))
+                    .sort((a, b) => {
+                        if (a.top !== b.top) return a.top - b.top;
+                        return a.index - b.index;
+                    })
+                    .map(item => item.text);
+
+                const content = normalizeText(lines.join('\n'));
+                return content.trim() ? content : '';
+            };
+
+            const readContentFromDomFallback = () => {
+                const containers = [];
+                const seen = new Set();
+
+                const primary = getPrimaryMonacoContainer();
+                if (primary) {
+                    containers.push(primary);
+                    seen.add(primary);
+                }
+
+                Array.from(document.querySelectorAll('.monaco-editor'))
+                    .filter(isVisibleElement)
+                    .forEach(container => {
+                        if (!seen.has(container)) {
+                            seen.add(container);
+                            containers.push(container);
+                        }
+                    });
+
+                let bestContent = '';
+                for (const container of containers) {
+                    const content = readMonacoViewLinesContent(container);
+                    if (content.length > bestContent.length) {
+                        bestContent = content;
+                    }
+                }
+
+                return bestContent;
+            };
+
             window.addEventListener('message', (event) => {
                 if (event.source !== window) return;
 
@@ -955,14 +1304,17 @@ ${templateSection}
                         const editors = getMonacoEditorsInPage();
                         const primary = pickPrimaryEditor(editors);
                         const model = primary?.getModel?.();
+                        const modelContent = normalizeText(model?.getValue?.() || '');
+                        const domContent = modelContent.trim() ? '' : readContentFromDomFallback();
+                        const content = modelContent.trim() ? modelContent : domContent;
 
-                        if (primary && model) {
-                            const content = model.getValue?.() || '';
+                        if (content.trim()) {
                             respond({
                                 ok: true,
                                 content,
                                 targetUri: getUriString(model?.uri),
-                                editorCount: editors.length
+                                editorCount: editors.length,
+                                method: modelContent.trim() ? 'model' : 'dom'
                             });
                         } else {
                             respond({ ok: false, content: '', editorCount: editors.length });
