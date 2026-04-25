@@ -4,6 +4,7 @@
 // @description  为V2EX帖子添加AI总结功能
 // @author       rrorange
 // @match        *://*.v2ex.com/t/*
+// @icon         https://www.v2ex.com/favicon.ico
 // @require      https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js
 // @require      https://cdn.jsdelivr.net/npm/element-ui@2.15.13/lib/index.js
 // @require      https://cdn.jsdelivr.net/npm/marked@4.0.18/marked.min.js
