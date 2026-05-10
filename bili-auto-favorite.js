@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili 快速收藏
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  在B站视频播放页添加"快速收藏"按钮。完美复刻原生UI风格，不会阻塞视频缩略图加载。新增：右键图片选择收藏夹功能。
 // @author       YourName & AliubYiero (Inspired by)
 // @match        https://www.bilibili.com/video/*
@@ -19,6 +19,8 @@
     // --- 配置区域 ---
     let defaultFavId = GM_getValue('BILI_DEFAULT_FAV_ID', null);
     let userFolders = null; // 缓存用户的收藏夹列表
+    let lastVideoKey = null;
+    let videoChangeWatcherInitialized = false;
 
     // --- 核心功能 ---
     function bvToAv(bvid) {
@@ -40,15 +42,19 @@
         return params.get('bili_jct');
     }
 
+    function getVideoIdFromUrl() {
+        const match = window.location.pathname.match(/\/video\/(av\d+|BV[a-zA-Z0-9]+)/);
+        return match?.[1] || null;
+    }
+
+    function getCurrentVideoKey() {
+        return getVideoIdFromUrl() || window.location.href;
+    }
+
     function getAid() {
-        if (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.aid) {
-            return window.__INITIAL_STATE__.aid.toString();
-        }
         try {
-            const path = window.location.pathname;
-            const match = path.match(/\/video\/(av\d+|BV1[a-zA-Z0-9]+)/);
-            if (match && match[1]) {
-                let videoId = match[1];
+            const videoId = getVideoIdFromUrl();
+            if (videoId) {
                 if (videoId.startsWith('BV')) {
                     return bvToAv(videoId).toString();
                 } else if (videoId.startsWith('av')) {
@@ -56,8 +62,73 @@
                 }
             }
         } catch (e) { console.error('快速收藏脚本：从URL解析aid时出错', e); }
+
+        if (window.__INITIAL_STATE__ && window.__INITIAL_STATE__.aid) {
+            return window.__INITIAL_STATE__.aid.toString();
+        }
+
         console.error('快速收藏脚本：所有方法都无法获取到 aid。');
         return null;
+    }
+
+    function resetQuickFavButton(button) {
+        const buttonText = button.querySelector('.video-toolbar-item-text');
+        if (buttonText) buttonText.textContent = '快收';
+        button.classList.remove('on');
+        button.disabled = false;
+    }
+
+    function syncQuickFavButtonWithCurrentVideo() {
+        const button = document.querySelector('#quick-fav-button');
+        if (!button) return;
+
+        const currentVideoKey = getCurrentVideoKey();
+        if (!currentVideoKey || button.dataset.videoKey === currentVideoKey) return;
+
+        button.dataset.videoKey = currentVideoKey;
+        lastVideoKey = currentVideoKey;
+        resetQuickFavButton(button);
+    }
+
+    function handleVideoChange() {
+        const currentVideoKey = getCurrentVideoKey();
+        if (!currentVideoKey || currentVideoKey === lastVideoKey) return;
+
+        lastVideoKey = currentVideoKey;
+        syncQuickFavButtonWithCurrentVideo();
+        initializeQuickFavButton();
+    }
+
+    function initVideoChangeWatcher() {
+        if (videoChangeWatcherInitialized) return;
+        videoChangeWatcherInitialized = true;
+        lastVideoKey = getCurrentVideoKey();
+
+        const notifyVideoUrlChange = () => {
+            window.dispatchEvent(new Event('quick-fav-location-change'));
+        };
+
+        const rawPushState = history.pushState;
+        history.pushState = function (...args) {
+            const result = rawPushState.apply(this, args);
+            notifyVideoUrlChange();
+            return result;
+        };
+
+        const rawReplaceState = history.replaceState;
+        history.replaceState = function (...args) {
+            const result = rawReplaceState.apply(this, args);
+            notifyVideoUrlChange();
+            return result;
+        };
+
+        window.addEventListener('quick-fav-location-change', () => {
+            setTimeout(handleVideoChange, 300);
+        });
+        window.addEventListener('popstate', () => setTimeout(handleVideoChange, 300));
+        window.addEventListener('hashchange', () => setTimeout(handleVideoChange, 300));
+
+        setInterval(handleVideoChange, 1000);
     }
 
     /**
@@ -112,14 +183,20 @@
         return null;
     }
 
-    function doCollect(aid, favId, button) {
+    function isButtonForVideo(button, videoKey) {
+        return !videoKey || button.dataset.videoKey === videoKey;
+    }
+
+    function doCollect(aid, favId, button, videoKey) {
         const csrf = getCsrf();
         if (!aid || !favId || !csrf || Number(aid) <= 0) {
             console.error('快速收藏失败：参数无效', { aid, favId, csrf });
             alert('快速收藏失败，无法获取有效的视频ID。');
             const buttonText = button.querySelector('.video-toolbar-item-text');
-            if (buttonText) buttonText.textContent = '快收';
-            button.disabled = false;
+            if (isButtonForVideo(button, videoKey)) {
+                if (buttonText) buttonText.textContent = '快收';
+                button.disabled = false;
+            }
             return;
         }
         const url = 'https://api.bilibili.com/x/v3/fav/resource/deal';
@@ -133,6 +210,8 @@
             onload: function (response) {
                 const res = response.response;
                 const buttonText = button.querySelector('.video-toolbar-item-text');
+                if (!isButtonForVideo(button, videoKey)) return;
+
                 if (res.code === 0 || res.code === 11015) {
                     console.log(res.code === 0 ? '快速收藏成功！' : '视频已在该收藏夹中。');
                     if (buttonText) buttonText.textContent = '已收';
@@ -147,6 +226,8 @@
             },
             onerror: function (error) {
                 console.error('快速收藏请求错误:', error);
+                if (!isButtonForVideo(button, videoKey)) return;
+
                 alert('快速收藏请求发送失败，请检查网络或控制台报错。');
                 const buttonText = button.querySelector('.video-toolbar-item-text');
                 if (buttonText) buttonText.textContent = '快收';
@@ -387,6 +468,7 @@
                         quickFavButton.id = 'quick-fav-button';
                         quickFavButton.className = 'video-toolbar-left-item';
                         quickFavButton.title = '左键：一键收藏到默认收藏夹\n右键：选择默认收藏夹';
+                        quickFavButton.dataset.videoKey = getCurrentVideoKey() || '';
 
                         // 复制按钮样式属性
                         const originalButton = originalFavButtonWrap.querySelector('.video-toolbar-left-item');
@@ -429,6 +511,7 @@
                         // 添加点击事件
                         quickFavButton.addEventListener('click', (e) => {
                             e.stopPropagation();
+                            syncQuickFavButtonWithCurrentVideo();
                             if (quickFavButton.disabled) return;
                             if (!defaultFavId) {
                                 promptForFavId();
@@ -437,7 +520,7 @@
                             buttonText.textContent = '...';
                             quickFavButton.disabled = true;
                             const aid = getAid();
-                            doCollect(aid, defaultFavId, quickFavButton);
+                            doCollect(aid, defaultFavId, quickFavButton, quickFavButton.dataset.videoKey);
                         });
 
                         // 添加右键事件
@@ -449,6 +532,7 @@
 
                         // 插入到DOM
                         originalFavButtonWrap.parentNode.insertBefore(quickFavWrap, originalFavButtonWrap.nextSibling);
+                        syncQuickFavButtonWithCurrentVideo();
 
                         // 成功添加按钮后清除定时器
                         clearInterval(checkAndAddInterval);
@@ -477,6 +561,7 @@
     function initialize() {
         initializeQuickFavButton();
         initContextMenu();
+        initVideoChangeWatcher();
     }
 
     // 使用window.onload确保页面完全加载后再执行脚本
